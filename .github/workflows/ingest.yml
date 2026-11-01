@@ -30,14 +30,29 @@ jobs:
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
         run: node scripts/ingest.mjs
 
-      - name: Commit if changed
+      # .dat 本体は git にコミットせず、固定リリース(tag=library)のアセットにする。
+      - name: Upload new replays as release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if git diff --quiet -- index.json library .cursor; then
-            echo "No new replays."
+          shopt -s nullglob
+          files=(pending/*.dat)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No new assets."
+            exit 0
+          fi
+          gh release view library >/dev/null 2>&1 || \
+            gh release create library --title "Shared replay library" --notes "ReplayToolbox の共有リプレイ（アセット）"
+          gh release upload library "${files[@]}" --clobber
+
+      - name: Commit index
+        run: |
+          if git diff --quiet -- index.json .cursor; then
+            echo "No index change."
             exit 0
           fi
           git config user.name "Rin"
           git config user.email "167505257+Rin-0617@users.noreply.github.com"
-          git add index.json library .cursor
+          git add index.json .cursor
           git commit -m "Ingest shared replays"
           git push

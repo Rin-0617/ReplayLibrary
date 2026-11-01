@@ -11,10 +11,13 @@ Dalamud プラグイン **ReplayToolbox** の共有リプレイ・ライブラ�
 
 | パス | 内容 |
 |---|---|
-| `index.json` | ライブラリ一覧（メタ情報） |
-| `library/<共有ID>.dat` | 匿名化済みリプレイ本体 |
+| `index.json` | ライブラリ一覧（メタ情報＋アセットURL） |
+| リリース `library` のアセット `<共有ID>.dat` | 匿名化済みリプレイ本体 |
 | `.github/workflows/ingest.yml` | Discord 共有チャンネルから自動取り込みする Action |
 | `scripts/ingest.mjs` | 取り込みスクリプト |
+
+`.dat` 本体は **git にはコミットせず、固定リリース（tag=`library`）のアセット**として置きます
+（git 肥大を避け、100MB の push 制限も回避。1アセット最大2GB）。
 
 ## `index.json` の各エントリ
 
@@ -26,7 +29,7 @@ Dalamud プラグイン **ReplayToolbox** の共有リプレイ・ライブラ�
   "recordedAt": "2026/10/26 21:30",
   "build": 14155597,
   "sharer": "a1b2c3d4",
-  "file": "library/9f3e21bc.dat",
+  "url": "https://github.com/Rin-0617/ReplayLibrary/releases/download/library/9f3e21bc.dat",
   "size": 60864,
   "uploadedAt": "2026-11-01T12:34:56.000Z"
 }

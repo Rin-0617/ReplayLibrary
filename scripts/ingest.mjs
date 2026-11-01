@@ -1,5 +1,7 @@
 // Discord の共有チャンネルから、ReplayToolbox が投稿した匿名化済みリプレイを取り込む。
-// 新規メッセージ（前回カーソル以降）だけを見て、.dat 添付を library/ に保存し index.json を更新する。
+// 新規メッセージ（前回カーソル以降）だけを見て、.dat 添付を pending/ に落とし、index.json を更新する。
+// .dat 本体は git にはコミットせず、後続ステップで「リリースのアセット」としてアップロードする
+// （git 肥大を避け、GitHub の100MB push 制限も回避する。1アセット最大2GB）。
 // bot トークンはこのスクリプトには埋め込まず、環境変数（Actions シークレット）から読む。
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,11 +13,17 @@ if (!TOKEN || !CHANNEL) {
   process.exit(1);
 }
 
+const OWNER = 'Rin-0617';
+const REPO = 'ReplayLibrary';
+const TAG = 'library';
+// .dat はこの固定リリース（tag=library）のアセットになる。URL は予測可能。
+const ASSET_BASE = `https://github.com/${OWNER}/${REPO}/releases/download/${TAG}/`;
+
 const ROOT = process.cwd();
-const LIB_DIR = path.join(ROOT, 'library');
+const PENDING = path.join(ROOT, 'pending');       // アップロード待ち（git 管理外）
 const INDEX_PATH = path.join(ROOT, 'index.json');
 const CURSOR_PATH = path.join(ROOT, '.cursor');
-fs.mkdirSync(LIB_DIR, { recursive: true });
+fs.mkdirSync(PENDING, { recursive: true });
 
 const index = fs.existsSync(INDEX_PATH) ? JSON.parse(fs.readFileSync(INDEX_PATH, 'utf8')) : [];
 const known = new Set(index.map((e) => e.id));
@@ -24,7 +32,7 @@ const startCursor = fs.existsSync(CURSOR_PATH) ? fs.readFileSync(CURSOR_PATH, 'u
 const API = 'https://discord.com/api/v10';
 const headers = { Authorization: `Bot ${TOKEN}` };
 
-// Discord は id を Snowflake（単調増加）で返すので、BigInt で大小比較する。
+// Discord の id は Snowflake（単調増加）なので BigInt で比較する。
 const maxId = (a, b) => (BigInt(a) > BigInt(b) ? a : b);
 
 async function fetchAfter(after) {
@@ -35,7 +43,6 @@ async function fetchAfter(after) {
 }
 
 // 共有メッセージ本文（ReplayToolbox が生成する形式）からメタを取り出す。
-// 例:
 //   **極○○討滅戦**（変換）
 //   録画日時: 2026/10/26 21:30 ／ ビルド 14155597
 //   共有者: `a1b2c3d4` ／ 共有ID: `9f3e21bc`
@@ -56,10 +63,10 @@ async function download(url) {
   return Buffer.from(await res.arrayBuffer());
 }
 
-// --- 新規メッセージを全部集める（after でページング） -----------------------
+// --- 新規メッセージを集める（after でページング） ---------------------------
 const fresh = [];
 let after = startCursor;
-for (let page = 0; page < 50; page++) { // 安全上限
+for (let page = 0; page < 50; page++) {
   const batch = await fetchAfter(after);
   if (batch.length === 0) break;
   fresh.push(...batch);
@@ -67,19 +74,18 @@ for (let page = 0; page < 50; page++) { // 安全上限
   if (batch.length < 100) break;
 }
 
-// 古い順に処理（id 昇順）
-fresh.sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
+fresh.sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1)); // 古い順
 
 let added = 0;
 let cursor = startCursor;
 for (const msg of fresh) {
-  cursor = maxId(cursor, msg.id); // 解析可否に関わらずカーソルは進める
+  cursor = maxId(cursor, msg.id);
   const dat = (msg.attachments || []).find((a) => (a.filename || '').toLowerCase().endsWith('.dat'));
   if (!dat) continue;
 
   const meta = parseMeta(msg.content || '');
   if (!meta.id) continue;          // ReplayToolbox 由来でない投稿は無視
-  if (known.has(meta.id)) continue; // 既出はスキップ（重複排除）
+  if (known.has(meta.id)) continue; // 既出はスキップ
 
   let bytes;
   try {
@@ -89,8 +95,7 @@ for (const msg of fresh) {
     continue;
   }
 
-  const rel = `library/${meta.id}.dat`;
-  fs.writeFileSync(path.join(ROOT, rel), bytes);
+  fs.writeFileSync(path.join(PENDING, `${meta.id}.dat`), bytes); // アップロード待ち
   index.push({
     id: meta.id,
     content: meta.content ?? '',
@@ -98,7 +103,7 @@ for (const msg of fresh) {
     recordedAt: meta.recordedAt ?? '',
     build: meta.build ?? 0,
     sharer: meta.sharer ?? '',
-    file: rel,
+    url: `${ASSET_BASE}${meta.id}.dat`,
     size: bytes.length,
     uploadedAt: new Date().toISOString(),
   });
@@ -107,8 +112,7 @@ for (const msg of fresh) {
   console.log(`+ ${meta.id} (${meta.content} / ${meta.kind}) ${bytes.length}B`);
 }
 
-// 新しい順に並べて保存（一覧の見栄え用）
-index.sort((a, b) => (a.uploadedAt < b.uploadedAt ? 1 : -1));
+index.sort((a, b) => (a.uploadedAt < b.uploadedAt ? 1 : -1)); // 新しい順
 fs.writeFileSync(INDEX_PATH, JSON.stringify(index, null, 2) + '\n');
 fs.writeFileSync(CURSOR_PATH, cursor + '\n');
 
