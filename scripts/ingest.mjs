@@ -63,6 +63,32 @@ async function download(url) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// .dat からパーティ構成（ClassJob の並び）を読む。PlayerSpawn（ペイロード664・プレイヤー宛て・
+// ClassJob がオフセット151）を、重複を除いて最大8人ぶん拾う。構造は匿名化・変換しても変わらない。
+// opcode 番号はビルドで変わるので使わず、ペイロード長と宛先IDで見分ける。見つからなければ空配列。
+export function readJobs(buf) {
+  const DATA_START = 876, HDR = 12;
+  if (buf.length < DATA_START + 0x4c) return [];
+  const dataLen = buf.readInt32LE(0x48);
+  const end = Math.min(DATA_START + dataLen, buf.length);
+  const jobs = [];
+  const seen = new Set();
+  let off = DATA_START;
+  while (off + HDR <= end) {
+    const length = buf.readUInt16LE(off + 2);
+    const oid = buf.readUInt32LE(off + 8);
+    const size = HDR + length;
+    if (size < HDR || off + size > end) break;
+    if (length >= 664 && oid >= 0x10000000 && oid < 0x11000000 && !seen.has(oid)) {
+      const job = buf[off + HDR + 151];
+      if (job >= 1 && job <= 42) { seen.add(oid); jobs.push(job); }
+    }
+    off += size;
+    if (jobs.length >= 8) break;
+  }
+  return jobs;
+}
+
 // --- 新規メッセージを集める（after でページング） ---------------------------
 const fresh = [];
 let after = startCursor;
@@ -106,6 +132,7 @@ for (const msg of fresh) {
     url: `${ASSET_BASE}${meta.id}.dat`,
     size: bytes.length,
     uploadedAt: new Date().toISOString(),
+    jobs: readJobs(bytes),
   });
   known.add(meta.id);
   added++;
