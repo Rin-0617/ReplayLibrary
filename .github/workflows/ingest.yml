@@ -2,7 +2,7 @@ name: Ingest shared replays
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # 30分ごと
+    - cron: "*/5 * * * *"   # 5分ごと（GitHub 側で間引かれるため実際は5〜15分おき程度）
   workflow_dispatch:
 
 permissions:
