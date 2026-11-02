@@ -63,6 +63,13 @@ async function download(url) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// .dat の実際のゲームビルド（ヘッダ 0x10）。変換後ファイルは変換先＝現行ビルドが入る。
+// メッセージの「ビルド◯◯」は変換“前”の値なので、再生可否の判定にはこちらを使う。
+export function readBuild(buf) {
+  if (buf.length < 0x14) return 0;
+  return buf.readInt32LE(0x10);
+}
+
 // .dat からパーティ構成（ClassJob の並び）を読む。PlayerSpawn（ペイロード664・プレイヤー宛て・
 // ClassJob がオフセット151）を、重複を除いて最大8人ぶん拾う。構造は匿名化・変換しても変わらない。
 // opcode 番号はビルドで変わるので使わず、ペイロード長と宛先IDで見分ける。見つからなければ空配列。
@@ -127,7 +134,7 @@ for (const msg of fresh) {
     content: meta.content ?? '',
     kind: meta.kind ?? '',
     recordedAt: meta.recordedAt ?? '',
-    build: meta.build ?? 0,
+    build: readBuild(bytes) || (meta.build ?? 0),
     sharer: meta.sharer ?? '',
     url: `${ASSET_BASE}${meta.id}.dat`,
     size: bytes.length,
