@@ -1,5 +1,47 @@
 [
   {
+    "id": "792851a4",
+    "content": "絶竜詩戦争",
+    "kind": "プル",
+    "recordedAt": "2026/11/18 21:59",
+    "build": 14251429,
+    "sharer": "414b1808",
+    "url": "https://github.com/Rin-0617/ReplayLibrary/releases/download/library/792851a4.dat",
+    "size": 7214104,
+    "uploadedAt": "2026-11-22T12:04:36.121Z",
+    "jobs": [
+      35,
+      34,
+      24,
+      38,
+      20,
+      21,
+      28,
+      19
+    ]
+  },
+  {
+    "id": "98c49f80",
+    "content": "絶竜詩戦争",
+    "kind": "プル",
+    "recordedAt": "2026/11/18 21:59",
+    "build": 14251429,
+    "sharer": "414b1808",
+    "url": "https://github.com/Rin-0617/ReplayLibrary/releases/download/library/98c49f80.dat",
+    "size": 7305892,
+    "uploadedAt": "2026-11-22T12:04:35.801Z",
+    "jobs": [
+      35,
+      34,
+      24,
+      38,
+      20,
+      21,
+      28,
+      19
+    ]
+  },
+  {
     "id": "5be91ee8",
     "content": "絶妖星乱舞",
     "kind": "プル",
